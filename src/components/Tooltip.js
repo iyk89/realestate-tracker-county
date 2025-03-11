@@ -4,20 +4,21 @@ const Tooltip = ({ content, position }) => {
   if (!content || !position) return null;
 
   const style = {
-    position: 'absolute',
+    position: 'fixed',
     left: position[0] + 'px',
-    top: position[1] + 'px',
+    top: (position[1] - 40) + 'px',
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     color: 'white',
     padding: '12px 16px',
     borderRadius: '6px',
     fontSize: '14px',
     pointerEvents: 'none',
-    transform: 'translate(-50%, -120%)',
+    transform: 'translate(-50%, -100%)',
     zIndex: 1000,
-    maxWidth: '350px',
+    width: '250px',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    backdropFilter: 'blur(2px)'
+    backdropFilter: 'blur(2px)',
+    overflow: 'auto'
   };
 
   // Split content into title and data

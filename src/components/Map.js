@@ -189,23 +189,23 @@ function USMap({ data }) {
         const name = feature.get('NAME');
         const state = feature.get('STATE');
         
-        let content = `${name}, ${state}`;
+        let content = name && state ? `${name}, ${state}` : 'Unknown Location';
 
         // Add median new listing price if data is available
         if (filteredData.length > 0) {
           const countyData = filteredData.find(item => {
-            if (!item.region_name) return false;
+            if (!item?.region_name || !name) return false;
             
-            // Extract county name from "county, state" format
+            // Extract county name from "region_name, state" format
             const regionParts = item.region_name.split(',');
             if (regionParts.length !== 2) return false;
             
             let countyName = regionParts[0].trim();
             // Remove "County" suffix if present
-            countyName = countyName.replace(/ County$/i, '').toLowerCase();
+            countyName = countyName?.replace(/ County$/i, '').toLowerCase() || '';
             
             // Clean up the feature name similarly
-            let featureName = name.replace(/ County$/i, '').toLowerCase();
+            let featureName = name?.replace(/ County$/i, '').toLowerCase() || '';
             
             return countyName === featureName;
           });
