@@ -11,13 +11,43 @@ import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat } from 'ol/proj';
 import Tooltip from './Tooltip';
 
+// Mapping of column names to human-readable labels
+const columnLabels = {
+  median_sale_price: 'Median Sale Price ($)',
+  median_sale_price_yoy: 'Median Sale Price YoY (%)',
+  median_sale_psf: 'Median Sale Price per Sqft ($)',
+  median_sale_psf_yoy: 'Median Sale Price per Sqft YoY (%)',
+  average_sale_to_list_ratio: 'Average Sale-to-List Ratio (%)',
+  average_sale_to_list_ratio_yoy: 'Average Sale-to-List Ratio YoY Change (%)',
+  adjusted_average_homes_sold: 'Average Homes Sold',
+  adjusted_average_homes_sold_yoy: 'Average Homes Sold YoY (%)',
+  median_new_listing_price: 'Median New Listing Price ($)',
+  median_new_listing_price_yoy: 'Median New Listing Price YoY (%)',
+  adjusted_average_new_listings: 'Avg. New Listings',
+  adjusted_average_new_listings_yoy: 'Avg. New Listings YoY (%)',
+  off_market_in_two_weeks: 'Listings Off Market Within 2 Weeks',
+  off_market_in_two_weeks_yoy: 'Listings Off Market Within 2 Weeks YoY (%)',
+  median_days_on_market: 'Median Days on Market',
+  median_days_on_market_yoy: 'Median Days on Market YoY (%)',
+  average_pending_sales_listing_updates: 'Avg. Pending Sales',
+  average_pending_sales_listing_updates_yoy: 'Avg. Pending Sales YoY (%)',
+  age_of_inventory: 'Age of Inventory (Days)',
+  age_of_inventory_yoy: 'Age of Inventory YoY (%)',
+  months_of_supply: 'Months of Supply',
+  months_of_supply_yoy: 'Months of Supply YoY (%)',
+  percent_active_listings_with_price_drops: '% Listings with Price Drops',
+  percent_active_listings_with_price_drops_yoy: '% Listings with Price Drops YoY (%)',
+  median_pending_sqft: 'Median Pending Square Feet',
+  median_pending_sqft_yoy: 'Median Pending Sqft YoY (%)'
+};
+
 // Cache for storing loaded data
 const dataCache = {
   state: null,
   county: null
 };
 
-function USMap({ data }) {
+function USMap({ data, selectedColumns }) {
   const mapRef = useRef();
   const [map, setMap] = useState(null);
   const [tooltipContent, setTooltipContent] = useState('');
@@ -187,12 +217,11 @@ function USMap({ data }) {
         feature.setStyle(highlightStyle);
         
         const name = feature.get('NAME');
-        const state = feature.get('STATE');
         
-        let content = name && state ? `${name}, ${state}` : 'Unknown Location';
+        let content = name ? `${name} County` : 'Unknown Location';
 
-        // Add median new listing price if data is available
-        if (filteredData.length > 0) {
+        // Add selected column data if available
+        if (filteredData.length > 0 && selectedColumns.length > 0) {
           const countyData = filteredData.find(item => {
             if (!item?.region_name || !name) return false;
             
@@ -209,10 +238,24 @@ function USMap({ data }) {
             
             return countyName === featureName;
           });
-          
-          if (countyData?.median_new_listing_price) {
-            content += `\n\nMedian New Listing Price: $${countyData.median_new_listing_price.toLocaleString()}`;
-          }
+
+          // Add data for each selected column
+          selectedColumns.forEach(column => {
+            if (countyData?.[column] !== undefined) {
+              const label = columnLabels[column] || column.replace(/_/g, ' ');
+              const value = countyData[column];
+              // Format the value based on whether it's a price, percentage, or other number
+              let formattedValue = value;
+              if (column.includes('price')) {
+                formattedValue = `$${Number(value).toLocaleString()}`;
+              } else if (column.includes('ratio') || column.includes('percent') || column.includes('yoy')) {
+                formattedValue = `${Number(value).toLocaleString()}%`;
+              } else {
+                formattedValue = Number(value).toLocaleString();
+              }
+              content += `\n\n${label}: ${formattedValue}`;
+            }
+          });
         }
         
         setTooltipContent(content);
@@ -226,7 +269,7 @@ function USMap({ data }) {
     return () => {
       map.un('pointermove', handlePointerMove);
     };
-  }, [map, stateLayer, countyLayer, filteredData]);
+  }, [map, stateLayer, countyLayer, filteredData, selectedColumns]);
 
   return (
     <div className="map-container">
