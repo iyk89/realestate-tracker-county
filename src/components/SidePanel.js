@@ -73,7 +73,7 @@ const columnLabels = {
   median_pending_sqft_yoy: 'Median Pending Sqft YoY (%)'
 };
 
-const SidePanel = ({ data, selectedColumns, onColumnSelect, loading, error }) => {
+const SidePanel = ({ data, selectedColumns, onColumnSelect, loading, loadingProgress, error }) => {
   // Filter data to only include counties and 4-week duration
   const filteredData = useMemo(() => {
     if (!data || data.length === 0) {
@@ -97,7 +97,7 @@ const SidePanel = ({ data, selectedColumns, onColumnSelect, loading, error }) =>
         {loading && (
           <div className="status-message status-loading">
             <div className="loading-spinner"></div>
-            Loading data...
+            Loading data... {loadingProgress}%
           </div>
         )}
         {error && (

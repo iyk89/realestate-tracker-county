@@ -158,17 +158,18 @@
 
 .status-section {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
   background-color: var(--background-light);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .status-message {
   display: flex;
   align-items: center;
   gap: 12px;
+  font-size: 14px;
   padding: 12px;
   border-radius: 6px;
-  font-size: 14px;
+  background-color: var(--background-light);
 }
 
 .status-loading {
@@ -183,14 +184,11 @@
 
 .status-info {
   color: var(--text-primary);
-  background-color: white;
+  background-color: rgba(37, 99, 235, 0.1);
 }
 
 .status-icon {
   font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .status-details {

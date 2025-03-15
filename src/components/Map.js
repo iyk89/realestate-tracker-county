@@ -10,6 +10,8 @@ import GeoJSON from 'ol/format/GeoJSON';
 import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat } from 'ol/proj';
 import Tooltip from './Tooltip';
+import PriceHistoryModal from './PriceHistoryModal';
+import { supabase } from '../supabaseClient';
 
 // Mapping of column names to human-readable labels
 const columnLabels = {
@@ -47,6 +49,20 @@ const dataCache = {
   county: null
 };
 
+function getColorScale(percentage) {
+    // Normalize the value between 0 and 1
+    // Input range is -100 to 100, so we add 100 and divide by 200
+    const normalized = (percentage + 100) / 200;
+    
+    // Convert to RGB values
+    // Red (high): rgb(255, 0, 0)
+    // Blue (low): rgb(0, 0, 255)
+    const red = Math.round(255 * normalized);
+    const blue = Math.round(255 * (1 - normalized));
+    
+    return `rgb(${red}, 0, ${blue})`;
+}
+
 function USMap({ data, selectedColumns }) {
   const mapRef = useRef();
   const [map, setMap] = useState(null);
@@ -56,6 +72,9 @@ function USMap({ data, selectedColumns }) {
   const [error, setError] = useState(null);
   const [stateLayer, setStateLayer] = useState(null);
   const [countyLayer, setCountyLayer] = useState(null);
+  const [selectedCounty, setSelectedCounty] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Create a memoized lookup map for county data
   const countyDataMap = useMemo(() => {
@@ -278,12 +297,122 @@ function USMap({ data, selectedColumns }) {
     };
   }, [map, stateLayer, countyLayer, selectedColumns, countyDataMap]);
 
+  // Function to fetch historical data for a county
+  const fetchCountyHistory = async (countyName) => {
+    try {
+      const { data: historyData, error } = await supabase
+        .from('housingdata')
+        .select('period_begin, median_sale_price')
+        .ilike('region_name', `${countyName}%`)
+        .eq('duration', '4 weeks')
+        .order('period_begin', { ascending: true });
+
+      if (error) throw error;
+
+      // Log raw data for debugging
+      console.log('Raw history data for', countyName, ':', historyData);
+
+      // Filter out invalid or unreasonable prices (e.g., above $10M or below $10K)
+      const validHistoryData = historyData.filter(item => {
+        const price = Number(item.median_sale_price);
+        const isValid = !isNaN(price) && price >= 10000 && price <= 10000000;
+        if (!isValid) {
+          console.log('Filtered out invalid price:', price, 'for date:', item.period_begin);
+        }
+        return isValid;
+      }).map(item => ({
+        ...item,
+        median_sale_price: Number(item.median_sale_price) / 1 // Divide by 1000 to correct scale
+      }));
+
+      // Group data by month and calculate median
+      const monthlyData = validHistoryData.reduce((acc, curr) => {
+        const date = new Date(curr.period_begin);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!acc[monthKey]) {
+          acc[monthKey] = [];
+        }
+        acc[monthKey].push(curr.median_sale_price);
+        return acc;
+      }, {});
+
+      // Calculate median for each month
+      const aggregatedData = Object.entries(monthlyData).map(([monthKey, prices]) => {
+        // Sort prices to calculate median
+        prices.sort((a, b) => a - b);
+        const median = prices.length % 2 === 0
+          ? (prices[prices.length/2 - 1] + prices[prices.length/2]) / 2
+          : prices[Math.floor(prices.length/2)];
+
+        const [year, month] = monthKey.split('-');
+        return {
+          period_begin: new Date(year, parseInt(month) - 1, 1).toISOString(),
+          median_sale_price: median
+        };
+      });
+
+      // Sort by date and log final data
+      const finalData = aggregatedData.sort((a, b) => 
+        new Date(a.period_begin) - new Date(b.period_begin)
+      );
+      
+      console.log('Final processed data for', countyName, ':', finalData);
+      return finalData;
+    } catch (error) {
+      console.error('Error fetching county history:', error);
+      return [];
+    }
+  };
+
+  // Handle county click
+  const handleCountyClick = async (feature) => {
+    const name = feature.get('NAME');
+    if (!name) return;
+
+    const countyName = `${name} County`;
+    const historyData = await fetchCountyHistory(name);
+    
+    setSelectedCounty(countyName);
+    setHistoryData(historyData);
+    setIsModalOpen(true);
+  };
+
+  // Add click handler to map
+  useEffect(() => {
+    if (!map) return;
+
+    const handleClick = async (e) => {
+      const feature = map.forEachFeatureAtPixel(e.pixel, feature => feature);
+      if (feature) {
+        await handleCountyClick(feature);
+      }
+    };
+
+    map.on('click', handleClick);
+    return () => map.un('click', handleClick);
+  }, [map]);
+
   return (
     <div className="map-container">
       <div ref={mapRef} className="map" style={{ width: '100%', height: '100%' }} />
       <Tooltip content={tooltipContent} position={tooltipPosition} />
+      <PriceHistoryModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        countyName={selectedCounty}
+        historyData={historyData}
+      />
     </div>
   );
 }
+
+const YoYPercentage = ({ percentage }) => {
+    return (
+        <div style={{ color: getColorScale(percentage) }}>
+            {percentage.toFixed(2)}%
+        </div>
+    );
+};
 
 export default USMap; 
