@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_housingdata_period_begin ON housingdata(period_begin); CREATE INDEX IF NOT EXISTS idx_housingdata_duration ON housingdata(duration); CREATE INDEX IF NOT EXISTS idx_housingdata_region_type ON housingdata(region_type); CREATE INDEX IF NOT EXISTS idx_housingdata_composite ON housingdata(duration, region_type, period_begin);

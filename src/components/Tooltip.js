@@ -11,7 +11,7 @@ const tooltipBaseStyle = {
   fontSize: '14px',
   pointerEvents: 'none',
   transform: 'translate(-50%, -100%)',
-  zIndex: 1000,
+  zIndex: 1001,
   minWidth: '280px',
   boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)',
   backdropFilter: 'blur(2px)'

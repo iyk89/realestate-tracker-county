@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import 'ol/ol.css';
 import Map from 'ol/Map';
 import View from 'ol/View';
@@ -57,14 +57,26 @@ function USMap({ data, selectedColumns }) {
   const [stateLayer, setStateLayer] = useState(null);
   const [countyLayer, setCountyLayer] = useState(null);
   
+  // Create a memoized lookup map for county data
+  const countyDataMap = useMemo(() => {
+    if (!data) return new Map();
+    
+    return data.reduce((map, item) => {
+      // Extract and normalize the county name from region_name
+      const regionParts = item.region_name.split(',');
+      if (regionParts.length === 2) {
+        const countyName = regionParts[0].trim().replace(/\s+county$/i, '').toLowerCase();
+        map.set(countyName, item);
+      }
+      return map;
+    }, new Map());
+  }, [data]);
+
   // Filter data to only include counties and 4-week duration
   const filteredData = React.useMemo(() => {
     if (!data) return [];
-    
-    return data.filter(item => 
-      item.region_type?.toLowerCase() === 'county' && 
-      item.duration?.toLowerCase() === '4 weeks'
-    );
+    console.log('Data length in Map:', data.length);
+    return data;
   }, [data]);
 
   // Memoized function to fetch data with caching
@@ -217,45 +229,40 @@ function USMap({ data, selectedColumns }) {
         feature.setStyle(highlightStyle);
         
         const name = feature.get('NAME');
-        
-        let content = name ? `${name} County` : 'Unknown Location';
+        const countyName = name ? `${name} County` : 'Unknown Location';
+        let content = countyName;
 
-        // Add selected column data if available
-        if (filteredData.length > 0 && selectedColumns.length > 0) {
-          const countyData = filteredData.find(item => {
-            if (!item?.region_name || !name) return false;
-            
-            // Extract county name from "region_name, state" format
-            const regionParts = item.region_name.split(',');
-            if (regionParts.length !== 2) return false;
-            
-            let countyName = regionParts[0].trim();
-            // Remove "County" suffix if present
-            countyName = countyName?.replace(/ County$/i, '').toLowerCase() || '';
-            
-            // Clean up the feature name similarly
-            let featureName = name?.replace(/ County$/i, '').toLowerCase() || '';
-            
-            return countyName === featureName;
-          });
+        // Add selected column data if available using the lookup map
+        if (selectedColumns.length > 0) {
+          // Clean up and normalize the feature name for lookup
+          const normalizedName = name?.replace(/\s+county$/i, '').toLowerCase().trim() || '';
+          const countyData = countyDataMap.get(normalizedName);
 
-          // Add data for each selected column
-          selectedColumns.forEach(column => {
-            if (countyData?.[column] !== undefined) {
-              const label = columnLabels[column] || column.replace(/_/g, ' ');
-              const value = countyData[column];
-              // Format the value based on whether it's a price, percentage, or other number
-              let formattedValue = value;
-              if (column.includes('price')) {
-                formattedValue = `$${Number(value).toLocaleString()}`;
-              } else if (column.includes('ratio') || column.includes('percent') || column.includes('yoy')) {
-                formattedValue = `${Number(value).toLocaleString()}%`;
-              } else {
-                formattedValue = Number(value).toLocaleString();
+          if (countyData) {
+            // Add data for each selected column
+            selectedColumns.forEach(column => {
+              if (countyData[column] !== undefined) {
+                const label = columnLabels[column] || column.replace(/_/g, ' ');
+                const value = countyData[column];
+                
+                // Format the value based on whether it's a price, percentage, or other number
+                let formattedValue = value;
+                if (column.includes('price') && !column.includes('yoy')) {
+                  formattedValue = `$${Number(value).toLocaleString()}`;
+                } else if (column.includes('ratio') || column.includes('percent') || column.includes('yoy')) {
+                  const numValue = Number(value);
+                  if (Math.abs(numValue) > 1) {
+                    formattedValue = `${numValue.toFixed(1)}%`;
+                  } else {
+                    formattedValue = `${(numValue * 100).toFixed(1)}%`;
+                  }
+                } else {
+                  formattedValue = Number(value).toLocaleString();
+                }
+                content += `\n${label}: ${formattedValue}`;
               }
-              content += `\n\n${label}: ${formattedValue}`;
-            }
-          });
+            });
+          }
         }
         
         setTooltipContent(content);
@@ -269,14 +276,10 @@ function USMap({ data, selectedColumns }) {
     return () => {
       map.un('pointermove', handlePointerMove);
     };
-  }, [map, stateLayer, countyLayer, filteredData, selectedColumns]);
+  }, [map, stateLayer, countyLayer, selectedColumns, countyDataMap]);
 
   return (
     <div className="map-container">
-      <div className="controls">
-        {loading && <span className="loading-indicator">Loading...</span>}
-        {error && <div className="error-message">{error}</div>}
-      </div>
       <div ref={mapRef} className="map" style={{ width: '100%', height: '100%' }} />
       <Tooltip content={tooltipContent} position={tooltipPosition} />
     </div>

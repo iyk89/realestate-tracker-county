@@ -6,8 +6,8 @@ const categories = {
   'Sales Metrics 📊': [
     'median_sale_price',
     'median_sale_price_yoy',
-    'median_sale_psf',
-    'median_sale_psf_yoy',
+    'median_sale_ppsf',
+    'median_sale_ppsf_yoy',
     'average_sale_to_list_ratio',
     'average_sale_to_list_ratio_yoy',
     'adjusted_average_homes_sold',
@@ -47,8 +47,8 @@ const categories = {
 const columnLabels = {
   median_sale_price: 'Median Sale Price ($)',
   median_sale_price_yoy: 'Median Sale Price YoY (%)',
-  median_sale_psf: 'Median Sale Price per Sqft ($)',
-  median_sale_psf_yoy: 'Median Sale Price per Sqft YoY (%)',
+  median_sale_ppsf: 'Median Sale Price per Sqft ($)',
+  median_sale_ppsf_yoy: 'Median Sale Price per Sqft YoY (%)',
   average_sale_to_list_ratio: 'Average Sale-to-List Ratio (%)',
   average_sale_to_list_ratio_yoy: 'Average Sale-to-List Ratio YoY Change (%)',
   adjusted_average_homes_sold: 'Average Homes Sold',
@@ -73,15 +73,15 @@ const columnLabels = {
   median_pending_sqft_yoy: 'Median Pending Sqft YoY (%)'
 };
 
-const SidePanel = ({ data, selectedColumns, onColumnSelect }) => {
+const SidePanel = ({ data, selectedColumns, onColumnSelect, loading, error }) => {
   // Filter data to only include counties and 4-week duration
   const filteredData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+    if (!data || data.length === 0) {
+      console.log('No data received in SidePanel');
+      return [];
+    }
     
-    return data.filter(item => 
-      item.region_type?.toLowerCase() === 'county' && 
-      item.duration?.toLowerCase() === '4 weeks'
-    );
+    return data;
   }, [data]);
 
   // Get all available columns from the data
@@ -93,50 +93,60 @@ const SidePanel = ({ data, selectedColumns, onColumnSelect }) => {
   return (
     <div className="side-panel">
       <h3>Select Data to Display</h3>
-      {filteredData.length > 0 ? (
-        <>
-          <div className="data-info">
-            <p>Showing data for counties with 4-week duration</p>
-            <p>Counties available: {filteredData.length}</p>
+      <div className="status-section">
+        {loading && (
+          <div className="status-message status-loading">
+            <div className="loading-spinner"></div>
+            Loading data...
           </div>
-          <div className="categories">
-            {Object.entries(categories).map(([categoryName, categoryColumns]) => {
-              // Filter out columns that don't exist in the data
-              const existingColumns = categoryColumns.filter(col => availableColumns.has(col));
-              if (existingColumns.length === 0) return null;
+        )}
+        {error && (
+          <div className="status-message status-error">
+            <span className="status-icon">⚠️</span>
+            {error}
+          </div>
+        )}
+        {!loading && !error && (
+          <div className="status-message status-info">
+            <span className="status-icon">📊</span>
+            <div className="status-details">
+              <div>4 week rolling average data</div>
+              <div>Counties available: {filteredData.length}</div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="categories">
+        {Object.entries(categories).map(([categoryName, categoryColumns]) => {
+          // Filter out columns that don't exist in the data
+          const existingColumns = categoryColumns.filter(col => availableColumns.has(col));
+          if (existingColumns.length === 0) return null;
 
-              return (
-                <div key={categoryName} className="category">
-                  <h4 className="category-title">{categoryName}</h4>
-                  <div className="column-selectors">
-                    {existingColumns.map((column) => (
-                      <label key={column} className="column-selector">
-                        <input
-                          type="checkbox"
-                          checked={selectedColumns.includes(column)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              onColumnSelect([...selectedColumns, column]);
-                            } else {
-                              onColumnSelect(selectedColumns.filter(col => col !== column));
-                            }
-                          }}
-                        />
-                        <span className="column-name">{columnLabels[column] || column.replace(/_/g, ' ')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <div className="empty-state">
-          <p>Upload a file with county-level data to see available data points</p>
-          <p>Make sure your data includes 'region_type', 'region_name', and 'duration' fields</p>
-        </div>
-      )}
+          return (
+            <div key={categoryName} className="category">
+              <h4 className="category-title">{categoryName}</h4>
+              <div className="column-selectors">
+                {existingColumns.map((column) => (
+                  <label key={column} className="column-selector">
+                    <input
+                      type="checkbox"
+                      checked={selectedColumns.includes(column)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onColumnSelect([...selectedColumns, column]);
+                        } else {
+                          onColumnSelect(selectedColumns.filter(col => col !== column));
+                        }
+                      }}
+                    />
+                    <span className="column-name">{columnLabels[column] || column.replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
